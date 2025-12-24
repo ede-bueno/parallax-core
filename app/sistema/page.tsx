@@ -15,7 +15,17 @@ import {
     Permission,
     CompanyPlan,
 } from '../../services/settingsService';
-import { addCompanyUser, updateUserRole, removeUser } from '../../services/usersService';
+import {
+    addCompanyUser,
+    updateUserRole,
+    removeUser,
+    inviteCompanyUser,
+    cancelInvite,
+    fetchPendingInvites,
+    PendingInvite
+} from '../../services/usersService';
+import InviteForm from '@/components/system/invites/InviteForm';
+import InviteRow from '@/components/system/invites/InviteRow';
 
 // Helper component: Add User Form
 function AddUserForm({ roles, onUserAdded }: { roles: Role[]; onUserAdded: () => void }) {
@@ -171,6 +181,130 @@ function UserRow({ user, roles, isLast, onUserUpdated }: { user: CompanyUser; ro
             </div>
         </div>
     );
+    // Helper component: Invite Form  
+    function InviteForm({ roles, onInviteSent }: { roles: Role[]; onInviteSent: () => void }) {
+        const [email, setEmail] = useState('');
+        const [selectedRole, setSelectedRole] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState<string | null>(null);
+
+        const handleSubmit = async (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!email || !selectedRole) return;
+
+            setLoading(true);
+            setError(null);
+
+            const { success, error: rpcError } = await inviteCompanyUser(email, selectedRole);
+
+            if (success) {
+                setEmail('');
+                setSelectedRole('');
+                onInviteSent();
+            } else {
+                setError(rpcError || 'Erro ao enviar convite');
+            }
+
+            setLoading(false);
+        };
+
+        return (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                <input
+                    type="email"
+                    placeholder="Email do usuário"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{
+                        flex: '1 1 200px',
+                        padding: 'var(--space-2)',
+                        backgroundColor: 'var(--background-default)',
+                        border: '1px solid var(--background-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-primary)',
+                        fontSize: 'var(--font-size-sm)',
+                    }}
+                    required
+                />
+                <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    style={{
+                        flex: '1 1 150px',
+                        padding: 'var(--space-2)',
+                        backgroundColor: 'var(--background-default)',
+                        border: '1px solid var(--background-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-primary)',
+                        fontSize: 'var(--font-size-sm)',
+                    }}
+                    required
+                >
+                    <option value="">Selecione role</option>
+                    {roles.map(role => (
+                        <option key={role.id} value={role.name}>{role.name}</option>
+                    ))}
+                </select>
+                <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                        padding: 'var(--space-2) var(--space-4)',
+                        backgroundColor: 'var(--action-primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--font-size-sm)',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        opacity: loading ? 0.6 : 1,
+                    }}
+                >
+                    {loading ? 'Enviando...' : 'Enviar Convite'}
+                </button>
+                {error && <p style={{ width: '100%', color: 'var(--status-error)', fontSize: 'var(--font-size-sm)' }}>{error}</p>}
+            </form>
+        );
+    }
+
+    //  Helper component: Invite Row
+    function InviteRow({ invite, onInviteCanceled }: { invite: PendingInvite; onInviteCanceled: () => void }) {
+        const [canceling, setCanceling] = useState(false);
+
+        const handleCancel = async () => {
+            if (!confirm(`Cancelar convite para ${invite.email}?`)) return;
+
+            setCanceling(true);
+            const { success } = await cancelInvite(invite.id);
+            setCanceling(false);
+
+            if (success) onInviteCanceled();
+        };
+
+        return (
+            <div style={{ padding: 'var(--space-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--background-border' }}>
+                <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-primary)' }}>{invite.email}</p>
+                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{invite.role} • {new Date(invite.createdAt).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <button
+                    onClick={handleCancel}
+                    disabled={canceling}
+                    style={{
+                        padding: 'var(--space-2) var(--space-3)',
+                        backgroundColor: 'var(--status-error)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--font-size-sm)',
+                        cursor: canceling ? 'not-allowed' : 'pointer',
+                        opacity: canceling ? 0.6 : 1,
+                    }}
+                >
+                    {canceling ? '...' : 'Cancelar'}
+                </button>
+            </div>
+        );
+    }
 }
 
 export default function SistemaPage() {
@@ -180,6 +314,7 @@ export default function SistemaPage() {
     const [roles, setRoles] = useState<Role[]>([]);
     const [permissions, setPermissions] = useState<Permission[]>([]);
     const [plan, setPlan] = useState<CompanyPlan | null>(null);
+    const [invites, setInvites] = useState<PendingInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -190,13 +325,14 @@ export default function SistemaPage() {
             setLoading(true);
             setError(null);
 
-            const [detailsResult, usersResult, rolesResult, permissionsResult, planResult] =
+            const [detailsResult, usersResult, rolesResult, permissionsResult, planResult, invitesResult] =
                 await Promise.all([
                     fetchCompanyDetails(companyId),
                     fetchCompanyUsers(companyId),
                     fetchRoles(),
                     fetchPermissions(),
                     fetchCompanyPlan(companyId),
+                    fetchPendingInvites(companyId),
                 ]);
 
             if (detailsResult.error) setError(detailsResult.error);
@@ -206,6 +342,7 @@ export default function SistemaPage() {
             if (!rolesResult.error) setRoles(rolesResult.data || []);
             if (!permissionsResult.error) setPermissions(permissionsResult.data || []);
             if (!planResult.error) setPlan(planResult.data);
+            if (!invitesResult.error) setInvites(invitesResult.data || []);
         } catch (err) {
             console.error('Settings load error:', err);
             setError('Erro ao carregar configurações');
@@ -274,6 +411,33 @@ export default function SistemaPage() {
                             </div>
                         </section>
 
+                        {/* Pending Invites */}
+                        <section>
+                            <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-4)' }}>
+                                Convites Pendentes ({invites.length})
+                            </h2>
+
+                            {/* Invite Form */}
+                            <div style={{ backgroundColor: 'var(--background-surface)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--background-border)', marginBottom: 'var(--space-4)' }}>
+                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-3)' }}>Enviar Convite</h3>
+                                <InviteForm roles={roles} onInviteSent={loadSettings} />
+                            </div>
+
+                            {/* Invites List */}
+                            {invites.length > 0 ? (
+                                <div style={{ backgroundColor: 'var(--background-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--background-border)', overflow: 'hidden' }}>
+                                    {invites.map(invite => (
+                                        <InviteRow key={invite.id} invite={invite} onInviteCanceled={loadSettings} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ backgroundColor: 'var(--background-surface)', padding: 'var(--space-5)', borderRadius: 'var(--radius-md)', border: '1px solid var(--background-border)', textAlign: 'center' }}>
+                                    <p style={{ color: 'var(--text-secondary)' }}>Nenhum convite pendente</p>
+                                </div>
+                            )}
+                        </section>
+
+
                         {/* Roles & Permissions */}
                         <section>
                             <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-4)' }}>
@@ -325,3 +489,4 @@ export default function SistemaPage() {
         </RequireRole>
     );
 }
+
