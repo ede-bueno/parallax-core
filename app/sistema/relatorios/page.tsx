@@ -15,7 +15,37 @@ import {
     fetchClientsGrowth,
     fetchProfessionalsActivity,
     fetchAdministrativeActivity,
+    fetchFinancialDetail,
+    fetchAppointmentsDetail,
+    fetchClientsDetail,
+    fetchProfessionalsDetail,
+    fetchAuditDetail,
+    convertToCSV,
+    downloadCSV,
 } from '../../../services/reportsService';
+
+// Export Button Component
+function ExportButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            style={{
+                padding: 'var(--space-2)',
+                backgroundColor: 'var(--action-primary)',
+                color: 'var(--action-primary-text)',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: 'var(--font-weight-medium)',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.5 : 1,
+            }}
+        >
+            Exportar CSV
+        </button>
+    );
+}
 
 export default function RelatoriosPage() {
     const { companyId, loading: contextLoading } = useUserContext();
@@ -83,6 +113,57 @@ export default function RelatoriosPage() {
         }
     };
 
+    // CSV Export Handlers
+    const handleExportFinancial = async () => {
+        if (!companyId) return;
+        const { data } = await fetchFinancialDetail(companyId, period);
+        if (data) {
+            const csv = convertToCSV(data, ['date', 'total_income', 'total_expenses', 'net_result']);
+            const filename = `parallax_financial_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(filename, csv);
+        }
+    };
+
+    const handleExportAppointments = async () => {
+        if (!companyId) return;
+        const { data } = await fetchAppointmentsDetail(companyId, period);
+        if (data) {
+            const csv = convertToCSV(data, ['appointment_id', 'date', 'status', 'client_name', 'professional_name']);
+            const filename = `parallax_appointments_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(filename, csv);
+        }
+    };
+
+    const handleExportClients = async () => {
+        if (!companyId) return;
+        const { data } = await fetchClientsDetail(companyId, period);
+        if (data) {
+            const csv = convertToCSV(data, ['client_id', 'full_name', 'created_at']);
+            const filename = `parallax_clients_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(filename, csv);
+        }
+    };
+
+    const handleExportProfessionals = async () => {
+        if (!companyId) return;
+        const { data } = await fetchProfessionalsDetail(companyId, period);
+        if (data) {
+            const csv = convertToCSV(data, ['professional_id', 'full_name', 'total_appointments_in_period']);
+            const filename = `parallax_professionals_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(filename, csv);
+        }
+    };
+
+    const handleExportAudit = async () => {
+        if (!companyId) return;
+        const { data } = await fetchAuditDetail(companyId);
+        if (data) {
+            const csv = convertToCSV(data, ['action_type', 'actor_email', 'target_email', 'created_at', 'metadata']);
+            const filename = `parallax_audit_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(filename, csv);
+        }
+    };
+
     return (
         <RequireRole allowedRoles={['admin']}>
             <div style={{ padding: 'var(--space-5)' }}>
@@ -143,13 +224,16 @@ export default function RelatoriosPage() {
                                 borderRadius: 'var(--radius-md)',
                                 border: '1px solid var(--background-border)',
                             }}>
-                                <h2 style={{
-                                    fontSize: 'var(--font-size-lg)',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    marginBottom: 'var(--space-3)',
-                                }}>
-                                    Resumo Financeiro
-                                </h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                                    <h2 style={{
+                                        fontSize: 'var(--font-size-lg)',
+                                        fontWeight: 'var(--font-weight-semibold)',
+                                        margin: 0,
+                                    }}>
+                                        Resumo Financeiro
+                                    </h2>
+                                    <ExportButton onClick={handleExportFinancial} disabled={loading} />
+                                </div>
                                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
                                     {getPeriodLabel(period)}
                                 </p>
@@ -188,13 +272,16 @@ export default function RelatoriosPage() {
                                 borderRadius: 'var(--radius-md)',
                                 border: '1px solid var(--background-border)',
                             }}>
-                                <h2 style={{
-                                    fontSize: 'var(--font-size-lg)',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    marginBottom: 'var(--space-3)',
-                                }}>
-                                    Agendamentos
-                                </h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                                    <h2 style={{
+                                        fontSize: 'var(--font-size-lg)',
+                                        fontWeight: 'var(--font-weight-semibold)',
+                                        margin: 0,
+                                    }}>
+                                        Agendamentos
+                                    </h2>
+                                    <ExportButton onClick={handleExportAppointments} disabled={loading} />
+                                </div>
                                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
                                     {getPeriodLabel(period)}
                                 </p>
@@ -237,13 +324,16 @@ export default function RelatoriosPage() {
                                 borderRadius: 'var(--radius-md)',
                                 border: '1px solid var(--background-border)',
                             }}>
-                                <h2 style={{
-                                    fontSize: 'var(--font-size-lg)',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    marginBottom: 'var(--space-3)',
-                                }}>
-                                    Clientes
-                                </h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                                    <h2 style={{
+                                        fontSize: 'var(--font-size-lg)',
+                                        fontWeight: 'var(--font-weight-semibold)',
+                                        margin: 0,
+                                    }}>
+                                        Clientes
+                                    </h2>
+                                    <ExportButton onClick={handleExportClients} disabled={loading} />
+                                </div>
                                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
                                     Crescimento
                                 </p>
@@ -272,13 +362,16 @@ export default function RelatoriosPage() {
                                 borderRadius: 'var(--radius-md)',
                                 border: '1px solid var(--background-border)',
                             }}>
-                                <h2 style={{
-                                    fontSize: 'var(--font-size-lg)',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    marginBottom: 'var(--space-3)',
-                                }}>
-                                    Profissionais
-                                </h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                                    <h2 style={{
+                                        fontSize: 'var(--font-size-lg)',
+                                        fontWeight: 'var(--font-weight-semibold)',
+                                        margin: 0,
+                                    }}>
+                                        Profissionais
+                                    </h2>
+                                    <ExportButton onClick={handleExportProfessionals} disabled={loading} />
+                                </div>
                                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
                                     Atividade
                                 </p>
@@ -308,13 +401,16 @@ export default function RelatoriosPage() {
                                 border: '1px solid var(--background-border)',
                                 gridColumn: 'span 2',
                             }}>
-                                <h2 style={{
-                                    fontSize: 'var(--font-size-lg)',
-                                    fontWeight: 'var(--font-weight-semibold)',
-                                    marginBottom: 'var(--space-3)',
-                                }}>
-                                    Atividade Administrativa
-                                </h2>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                                    <h2 style={{
+                                        fontSize: 'var(--font-size-lg)',
+                                        fontWeight: 'var(--font-weight-semibold)',
+                                        margin: 0,
+                                    }}>
+                                        Atividade Administrativa
+                                    </h2>
+                                    <ExportButton onClick={handleExportAudit} disabled={loading} />
+                                </div>
                                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
                                     Ações recentes
                                 </p>

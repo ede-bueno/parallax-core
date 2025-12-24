@@ -305,3 +305,294 @@ export async function fetchAdministrativeActivity(
         return { data: null, error: errorMessage };
     }
 }
+
+// ============================================
+// CSV Export Helpers
+// ============================================
+
+/**
+ * Convert array of objects to CSV string
+ */
+function convertToCSV(data: any[], headers: string[]): string {
+    if (data.length === 0) return headers.join(',');
+
+    const rows = data.map(row =>
+        headers.map(header => {
+            const value = row[header];
+            // Escape commas and quotes in values
+            if (value === null || value === undefined) return '';
+            const stringValue = String(value);
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return stringValue;
+        }).join(',')
+    );
+
+    return [headers.join(','), ...rows].join('\n');
+}
+
+/**
+ * Trigger CSV download
+ */
+export function downloadCSV(filename: string, csvContent: string): void {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ============================================
+// Detailed Fetch Functions for CSV Export
+// ============================================
+
+export interface FinancialDetailRow {
+    date: string;
+    total_income: number;
+    total_expenses: number;
+    net_result: number;
+}
+
+export async function fetchFinancialDetail(
+    companyId: string,
+    period: ReportPeriod
+): Promise<{
+    data: FinancialDetailRow[] | null;
+    error: string | null;
+}> {
+    if (!isSupabaseConfigured()) {
+        return { data: null, error: 'Supabase not configured' };
+    }
+
+    try {
+        const { startDate, endDate } = getDateRange(period);
+
+        const { data, error } = await supabase!
+            .from('view_financial_daily_summary')
+            .select('date, total_income, total_expenses')
+            .eq('company_id', companyId)
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: true });
+
+        if (error) {
+            return { data: null, error: error.message };
+        }
+
+        const rows = (data || []).map(row => ({
+            date: row.date,
+            total_income: row.total_income || 0,
+            total_expenses: row.total_expenses || 0,
+            net_result: (row.total_income || 0) - (row.total_expenses || 0),
+        }));
+
+        return { data: rows, error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+}
+
+export interface AppointmentDetailRow {
+    appointment_id: string;
+    date: string;
+    status: string;
+    client_name: string;
+    professional_name: string;
+}
+
+export async function fetchAppointmentsDetail(
+    companyId: string,
+    period: ReportPeriod
+): Promise<{
+    data: AppointmentDetailRow[] | null;
+    error: string | null;
+}> {
+    if (!isSupabaseConfigured()) {
+        return { data: null, error: 'Supabase not configured' };
+    }
+
+    try {
+        const { startDate, endDate } = getDateRange(period);
+
+        const { data, error } = await supabase!
+            .from('view_appointments')
+            .select('id, scheduled_at, status, client_name, professional_name')
+            .eq('company_id', companyId)
+            .gte('scheduled_at', startDate)
+            .lte('scheduled_at', endDate)
+            .order('scheduled_at', { ascending: true });
+
+        if (error) {
+            return { data: null, error: error.message };
+        }
+
+        const rows = (data || []).map(row => ({
+            appointment_id: row.id,
+            date: row.scheduled_at,
+            status: row.status || '',
+            client_name: row.client_name || '',
+            professional_name: row.professional_name || '',
+        }));
+
+        return { data: rows, error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+}
+
+export interface ClientDetailRow {
+    client_id: string;
+    full_name: string;
+    created_at: string;
+}
+
+export async function fetchClientsDetail(
+    companyId: string,
+    period: ReportPeriod
+): Promise<{
+    data: ClientDetailRow[] | null;
+    error: string | null;
+}> {
+    if (!isSupabaseConfigured()) {
+        return { data: null, error: 'Supabase not configured' };
+    }
+
+    try {
+        const { startDate } = getDateRange(period);
+
+        const { data, error } = await supabase!
+            .from('view_clients')
+            .select('id, full_name, created_at')
+            .eq('company_id', companyId)
+            .gte('created_at', startDate)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            return { data: null, error: error.message };
+        }
+
+        const rows = (data || []).map(row => ({
+            client_id: row.id,
+            full_name: row.full_name || '',
+            created_at: row.created_at,
+        }));
+
+        return { data: rows, error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+}
+
+export interface ProfessionalDetailRow {
+    professional_id: string;
+    full_name: string;
+    total_appointments_in_period: number;
+}
+
+export async function fetchProfessionalsDetail(
+    companyId: string,
+    period: ReportPeriod
+): Promise<{
+    data: ProfessionalDetailRow[] | null;
+    error: string | null;
+}> {
+    if (!isSupabaseConfigured()) {
+        return { data: null, error: 'Supabase not configured' };
+    }
+
+    try {
+        const { startDate, endDate } = getDateRange(period);
+
+        // Fetch all professionals
+        const { data: professionals, error: profError } = await supabase!
+            .from('view_professionals')
+            .select('id, full_name')
+            .eq('company_id', companyId)
+            .order('full_name', { ascending: true });
+
+        if (profError) {
+            return { data: null, error: profError.message };
+        }
+
+        // Fetch appointments in period
+        const { data: appointments, error: appError } = await supabase!
+            .from('view_appointments')
+            .select('professional_id')
+            .eq('company_id', companyId)
+            .gte('scheduled_at', startDate)
+            .lte('scheduled_at', endDate);
+
+        if (appError) {
+            return { data: null, error: appError.message };
+        }
+
+        // Count appointments per professional
+        const appointmentCounts: Record<string, number> = {};
+        (appointments || []).forEach(app => {
+            appointmentCounts[app.professional_id] = (appointmentCounts[app.professional_id] || 0) + 1;
+        });
+
+        const rows = (professionals || []).map(prof => ({
+            professional_id: prof.id,
+            full_name: prof.full_name || '',
+            total_appointments_in_period: appointmentCounts[prof.id] || 0,
+        }));
+
+        return { data: rows, error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+}
+
+export interface AuditDetailRow {
+    action_type: string;
+    actor_email: string;
+    target_email: string;
+    created_at: string;
+    metadata: string;
+}
+
+export async function fetchAuditDetail(
+    companyId: string
+): Promise<{
+    data: AuditDetailRow[] | null;
+    error: string | null;
+}> {
+    if (!isSupabaseConfigured()) {
+        return { data: null, error: 'Supabase not configured' };
+    }
+
+    try {
+        const { data, error } = await supabase!
+            .from('view_audit_logs')
+            .select('action_type, actor_email, target_email, created_at, metadata')
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        if (error) {
+            return { data: null, error: error.message };
+        }
+
+        const rows = (data || []).map(row => ({
+            action_type: row.action_type,
+            actor_email: row.actor_email || '',
+            target_email: row.target_email || '',
+            created_at: row.created_at,
+            metadata: row.metadata ? JSON.stringify(row.metadata) : '',
+        }));
+
+        return { data: rows, error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+}
+
+export { convertToCSV };
+

@@ -35,6 +35,7 @@
 - **RPC functions** for all write operations
 - **Zero direct table access** from frontend
 - **Report aggregation** via view queries (read-only)
+- **CSV export** client-side from view data
 
 ### Authentication
 - **Supabase Auth**

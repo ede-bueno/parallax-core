@@ -40,6 +40,7 @@ const { data } = await supabase
 - Backend controls data shape
 - Easier to optimize (indexes, materialized views)
 - **Reporting**: Aggregate queries across multiple views for management insights
+- **CSV Export**: Client-side generation from view data for external analysis
 
 ## RPC-Only Rule (Writes)
 
