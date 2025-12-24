@@ -1,11 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { fetchUserContext, UserContextData } from '../services/userContextService';
+import { setActiveCompany } from '../services/companyService';
 
 interface UserContextValue extends UserContextData {
     loading: boolean;
     error: string | null;
+    switchCompany: (companyId: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -26,9 +28,10 @@ interface UserContextProviderProps {
  * - Handles loading/error states gracefully
  * - Never blocks layout render
  * - Never throws unhandled exceptions
+ * - Supports company switching via switchCompany()
  */
 export function UserContextProvider({ children }: UserContextProviderProps) {
-    const [contextValue, setContextValue] = useState<UserContextValue>({
+    const [contextValue, setContextValue] = useState<Omit<UserContextValue, 'switchCompany'>>({
         userId: null,
         fullName: null,
         email: null,
@@ -40,37 +43,73 @@ export function UserContextProvider({ children }: UserContextProviderProps) {
         error: null,
     });
 
-    useEffect(() => {
-        async function loadUserContext() {
-            try {
-                const { data, error } = await fetchUserContext();
+    const loadUserContext = useCallback(async () => {
+        try {
+            const { data, error } = await fetchUserContext();
 
-                setContextValue({
-                    userId: data?.userId || null,
-                    fullName: data?.fullName || null,
-                    email: data?.email || null,
-                    companyId: data?.companyId || null,
-                    companyName: data?.companyName || null,
-                    branchId: data?.branchId || null,
-                    role: data?.role || null,
-                    loading: false,
-                    error: error,
-                });
-            } catch (err) {
-                console.error('Failed to load user context:', err);
+            setContextValue({
+                userId: data?.userId || null,
+                fullName: data?.fullName || null,
+                email: data?.email || null,
+                companyId: data?.companyId || null,
+                companyName: data?.companyName || null,
+                branchId: data?.branchId || null,
+                role: data?.role || null,
+                loading: false,
+                error: error,
+            });
+        } catch (err) {
+            console.error('Failed to load user context:', err);
+            setContextValue(prev => ({
+                ...prev,
+                loading: false,
+                error: 'Failed to load user context',
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        loadUserContext();
+    }, [loadUserContext]);
+
+    /**
+     * Switch active company
+     * Calls RPC set_active_company and reloads context
+     */
+    const switchCompany = useCallback(async (companyId: string) => {
+        try {
+            setContextValue(prev => ({ ...prev, loading: true, error: null }));
+
+            const { success, error } = await setActiveCompany(companyId);
+
+            if (!success) {
                 setContextValue(prev => ({
                     ...prev,
                     loading: false,
-                    error: 'Failed to load user context',
+                    error: error || 'Failed to switch company',
                 }));
+                return;
             }
-        }
 
-        loadUserContext();
-    }, []);
+            // Reload context after successful switch
+            await loadUserContext();
+        } catch (err) {
+            console.error('Failed to switch company:', err);
+            setContextValue(prev => ({
+                ...prev,
+                loading: false,
+                error: 'Failed to switch company',
+            }));
+        }
+    }, [loadUserContext]);
+
+    const valueWithSwitch: UserContextValue = {
+        ...contextValue,
+        switchCompany,
+    };
 
     return (
-        <UserContext.Provider value={contextValue}>
+        <UserContext.Provider value={valueWithSwitch}>
             {children}
         </UserContext.Provider>
     );
@@ -80,7 +119,7 @@ export function UserContextProvider({ children }: UserContextProviderProps) {
  * Hook to access user context
  * 
  * Usage:
- * const { userId, companyId, loading, error } = useUserContext();
+ * const { userId, companyId, loading, error, switchCompany } = useUserContext();
  * 
  * Always check loading before using data
  * Always handle error state appropriately
