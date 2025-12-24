@@ -1,8 +1,9 @@
 -- ============================================
--- MIGRATION: Branch-Aware Views
+-- MIGRATION: Branch-Aware Views (CORRECTED)
 -- ============================================
--- Purpose: Create NEW views that filter by branch
+-- Purpose: Create NEW views that are branch-aware
 -- Rule: Do NOT modify existing views
+-- Compatible with CURRENT database schema
 -- ============================================
 
 BEGIN;
@@ -12,89 +13,82 @@ BEGIN;
 -- ============================================
 
 CREATE OR REPLACE VIEW view_clients_branch AS
-SELECT 
+SELECT
     c.id,
     c.company_id,
     c.branch_id,
     c.full_name,
-    c.email,
-    c.phone,
-    c.cpf,
-    c.birth_date,
-    c.address,
-    c.city,
-    c.state,
-    c.zip_code,
-    c.notes,
-    c.created_at,
-    c.updated_at
+    c.active,
+    c.created_at
 FROM clients c
-WHERE c.company_id IN (
-    SELECT company_id FROM user_active_company WHERE user_id = auth.uid()
+WHERE c.company_id = (
+    SELECT company_id
+    FROM user_active_company
+    WHERE user_id = auth.uid()
 );
 
--- RLS on view
 ALTER VIEW view_clients_branch SET (security_invoker = true);
 
-COMMENT ON VIEW view_clients_branch IS 'Clients filtered by company_id and branch_id - for branch-aware queries';
+COMMENT ON VIEW view_clients_branch
+IS 'Clients filtered by company_id and branch_id (branch-aware)';
 
 -- ============================================
 -- view_professionals_branch
 -- ============================================
 
 CREATE OR REPLACE VIEW view_professionals_branch AS
-SELECT 
+SELECT
     p.id,
     p.company_id,
     p.branch_id,
-    p.full_name,
-    p.email,
-    p.phone,
-    p.specialty,
-    p.avatar_url,
-    p.created_at,
-    p.updated_at
+    pr.full_name,
+    pr.email,
+    p.active,
+    p.created_at
 FROM professionals p
-WHERE p.company_id IN (
-    SELECT company_id FROM user_active_company WHERE user_id = auth.uid()
+LEFT JOIN profiles pr ON pr.id = p.profile_id
+WHERE p.company_id = (
+    SELECT company_id
+    FROM user_active_company
+    WHERE user_id = auth.uid()
 );
 
--- RLS on view
 ALTER VIEW view_professionals_branch SET (security_invoker = true);
 
-COMMENT ON VIEW view_professionals_branch IS 'Professionals filtered by company_id and branch_id - for branch-aware queries';
+COMMENT ON VIEW view_professionals_branch
+IS 'Professionals filtered by company_id and branch_id (branch-aware)';
 
 -- ============================================
 -- view_appointments_branch
 -- ============================================
 
 CREATE OR REPLACE VIEW view_appointments_branch AS
-SELECT 
+SELECT
     a.id,
     a.company_id,
     a.branch_id,
     a.client_id,
     a.professional_id,
-    a.scheduled_at,
-    a.duration_minutes,
-    a.status,
-    a.notes,
+    a.start_time,
+    a.end_time,
     a.created_at,
-    a.updated_at,
-    c.full_name as client_name,
-    p.full_name as professional_name,
-    p.specialty as professional_specialty
+    c.full_name AS client_name,
+    pr.full_name AS professional_name,
+    pr.email AS professional_email
 FROM appointments a
 LEFT JOIN clients c ON c.id = a.client_id
 LEFT JOIN professionals p ON p.id = a.professional_id
-WHERE a.company_id IN (
-    SELECT company_id FROM user_active_company WHERE user_id = auth.uid()
+LEFT JOIN profiles pr ON pr.id = p.profile_id
+WHERE a.company_id = (
+    SELECT company_id
+    FROM user_active_company
+    WHERE user_id = auth.uid()
 );
 
--- RLS on view
 ALTER VIEW view_appointments_branch SET (security_invoker = true);
 
-COMMENT ON VIEW view_appointments_branch IS 'Appointments filtered by company_id and branch_id - for branch-aware queries';
+COMMENT ON VIEW view_appointments_branch
+IS 'Appointments filtered by company_id and branch_id (branch-aware)';
 
 -- ============================================
 -- view_daily_agenda_branch
@@ -102,59 +96,60 @@ COMMENT ON VIEW view_appointments_branch IS 'Appointments filtered by company_id
 
 CREATE OR REPLACE VIEW view_daily_agenda_branch AS
 SELECT
-    a.id as appointment_id,
+    a.id AS appointment_id,
     a.company_id,
     a.branch_id,
     a.professional_id,
     a.client_id,
-    a.scheduled_at,
-    a.duration_minutes,
-    a.status,
-    a.notes,
-    p.full_name as professional_name,
-    p.specialty as professional_specialty,
-    p.avatar_url as professional_avatar,
-    c.full_name as client_name,
-    c.phone as client_phone,
-    DATE(a.scheduled_at) as date,
-    EXTRACT(HOUR FROM a.scheduled_at) as hour,
-    EXTRACT(MINUTE FROM a.scheduled_at) as minute
+    a.start_time,
+    a.end_time,
+    DATE(a.start_time) AS date,
+    EXTRACT(HOUR FROM a.start_time) AS hour,
+    EXTRACT(MINUTE FROM a.start_time) AS minute,
+    c.full_name AS client_name,
+    pr.full_name AS professional_name,
+    pr.email AS professional_email
 FROM appointments a
-LEFT JOIN professionals p ON p.id = a.professional_id
 LEFT JOIN clients c ON c.id = a.client_id
-WHERE a.company_id IN (
-    SELECT company_id FROM user_active_company WHERE user_id = auth.uid()
+LEFT JOIN professionals p ON p.id = a.professional_id
+LEFT JOIN profiles pr ON pr.id = p.profile_id
+WHERE a.company_id = (
+    SELECT company_id
+    FROM user_active_company
+    WHERE user_id = auth.uid()
 );
 
--- RLS on view
 ALTER VIEW view_daily_agenda_branch SET (security_invoker = true);
 
-COMMENT ON VIEW view_daily_agenda_branch IS 'Daily agenda filtered by company_id and branch_id - for branch-aware queries';
+COMMENT ON VIEW view_daily_agenda_branch
+IS 'Daily agenda filtered by company_id and branch_id (branch-aware)';
 
 -- ============================================
 -- view_my_branches
 -- ============================================
 
 CREATE OR REPLACE VIEW view_my_branches AS
-SELECT 
+SELECT
     b.id,
     b.company_id,
     b.name,
     b.created_at,
-    COUNT(DISTINCT c.id) as client_count,
-    COUNT(DISTINCT p.id) as professional_count
+    COUNT(DISTINCT c.id) AS client_count,
+    COUNT(DISTINCT p.id) AS professional_count
 FROM branches b
 LEFT JOIN clients c ON c.branch_id = b.id
 LEFT JOIN professionals p ON p.branch_id = b.id
-WHERE b.company_id IN (
-    SELECT company_id FROM user_active_company WHERE user_id = auth.uid()
+WHERE b.company_id = (
+    SELECT company_id
+    FROM user_active_company
+    WHERE user_id = auth.uid()
 )
 GROUP BY b.id, b.company_id, b.name, b.created_at
 ORDER BY b.name ASC;
 
--- RLS on view
 ALTER VIEW view_my_branches SET (security_invoker = true);
 
-COMMENT ON VIEW view_my_branches IS 'Branches of the active company with counts';
+COMMENT ON VIEW view_my_branches
+IS 'Branches of the active company with aggregated counts';
 
 COMMIT;
