@@ -1,6 +1,6 @@
 'use client';
 
-import '../styles/layout.css';
+import '../../styles/layout.css';
 
 export default function Header() {
     return (

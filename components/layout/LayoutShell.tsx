@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import '../styles/layout.css';
+import '../../styles/layout.css';
 
 interface LayoutShellProps {
     children: ReactNode;
