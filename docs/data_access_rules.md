@@ -55,7 +55,7 @@ const { data } = await supabase
 const { error } = await supabase
   .rpc('add_company_user', {
     user_email: email,
-    role_key: role,
+    user_role: role,
   });
 
 // ❌ WRONG
@@ -91,18 +91,18 @@ VALUES (
   auth.uid(),
   target_user_id_if_applicable,
   active_company_id,
-  jsonb_build_object('key', 'value', ...)
+  jsonb_build_object('email', user_email, 'role', user_role, 'new_role', new_role)
 );
 ```
 
 **Instrumented RPCs (production):**
-- `invite_company_user` - Invite user to company
-- `cancel_company_invite` - Cancel pending invite
-- `accept_company_invite` - Accept company invitation
-- `add_company_user` - Add existing user to company
-- `update_company_user_role` - Change user's role
-- `remove_company_user` - Remove user from company
-- `set_active_company` - Switch active company context
+- `invite_company_user(user_email, user_role)` - Invite user to company
+- `cancel_company_invite(invite_id)` - Cancel pending invite
+- `accept_company_invite(invite_token)` - Accept company invitation
+- `add_company_user(user_email, user_role)` - Add existing user to company
+- `update_company_user_role(target_user_id, new_role)` - Change user's role
+- `remove_company_user(user_id)` - Remove user from company
+- `set_active_company(company_id)` - Switch active company context
 
 Each instrumented RPC creates an audit log entry in the same transaction. If the RPC fails or rolls back, the audit log entry is also rolled back.
 

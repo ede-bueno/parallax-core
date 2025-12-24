@@ -91,7 +91,7 @@ USING (
 **Example**:
 ```sql
 -- RPC validates company ownership before action
-CREATE FUNCTION invite_company_user(user_email TEXT, role_key TEXT)
+CREATE FUNCTION invite_company_user(user_email TEXT, user_role TEXT)
 RETURNS VOID AS $$
 DECLARE
   active_company_id UUID;
