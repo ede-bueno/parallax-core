@@ -39,6 +39,7 @@ const { data } = await supabase
 - No over-fetching or under-fetching
 - Backend controls data shape
 - Easier to optimize (indexes, materialized views)
+- **Reporting**: Aggregate queries across multiple views for management insights
 
 ## RPC-Only Rule (Writes)
 

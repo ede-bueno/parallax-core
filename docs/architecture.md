@@ -34,6 +34,7 @@
 - **Views** for all read operations
 - **RPC functions** for all write operations
 - **Zero direct table access** from frontend
+- **Report aggregation** via view queries (read-only)
 
 ### Authentication
 - **Supabase Auth**
