@@ -1,0 +1,191 @@
+# Data Access Rules
+
+## Core Principle: "Banco Decide"
+
+The database is the single source of truth. The frontend **reads from views** and **writes via RPC**. Direct table access is **forbidden**.
+
+## Views-Only Rule (Reads)
+
+### Why Views?
+1. **Encapsulation**: Hide schema complexity
+2. **Security**: Views enforce RLS from base tables
+3. **Stability**: Schema changes don't break frontend
+4. **Business Logic**: Computed fields, joins, aggregations happen in DB
+
+### How to Query
+```typescript
+// ✅ CORRECT
+const { data } = await supabase
+  .from('view_clients')
+  .select('*')
+  .eq('company_id', companyId);
+
+// ❌ WRONG
+const { data } = await supabase
+  .from('clients')  // Never query tables directly
+  .select('*');
+```
+
+### Naming Convention
+- Prefix: `view_`
+- Examples:
+  - `view_clients`
+  - `view_appointments`
+  - `view_user_context`
+  - `view_financial_daily_summary`
+
+### View Benefits
+- Frontend gets exactly the data it needs
+- No over-fetching or under-fetching
+- Backend controls data shape
+- Easier to optimize (indexes, materialized views)
+
+## RPC-Only Rule (Writes)
+
+### Why RPC?
+1. **Validation**: Server validates all writes
+2. **Business Rules**: Complex logic stays in DB
+3. **Atomicity**: Transactions handled safely
+4. **Audit**: All writes logged/traceable
+
+### How to Write
+```typescript
+// ✅ CORRECT
+const { error } = await supabase
+  .rpc('add_company_user', {
+    user_email: email,
+    role_key: role,
+  });
+
+// ❌ WRONG
+const { error } = await supabase
+  .from('company_users')  // Never insert directly
+  .insert({ ... });
+```
+
+### Naming Convention
+- Snake_case
+- Verb-first
+- Examples:
+  - `add_company_user`
+  - `update_company_user_role`
+  - `cancel_company_invite`
+  - `set_active_company`
+
+### RPC Benefits
+- Centralized business logic
+- Consistent validation
+- Prevents invalid state
+- Easy to add authorization checks
+
+## Why Tables Are Never Accessed Directly
+
+### Schema Coupling
+- Table structure changes break frontend
+- Views provide stable interface
+- Refactoring happens without frontend changes
+
+### Security Bypass Risk
+- Direct writes can bypass validation
+- RLS might not cover all edge cases
+- RPC enforces additional checks
+
+### Business Logic Duplication
+- Logic in both frontend and backend = bugs
+- Single source of truth prevents drift
+
+### Example: Bad vs Good
+
+**❌ BAD (Direct Access)**
+```typescript
+// Frontend has to know:
+// - Table structure
+// - Validation rules
+// - Foreign key relationships
+const { data } = await supabase
+  .from('appointments')
+  .insert({
+    client_id: clientId,
+    professional_id: professionalId,
+    service_id: serviceId,
+    scheduled_at: date,
+    // ... 10 more fields
+  });
+```
+
+**✅ GOOD (RPC)**
+```typescript
+// Backend handles:
+// - Validation
+// - Defaults
+// - Related records
+// - Business rules
+const { error } = await supabase
+  .rpc('create_appointment', {
+    client_id: clientId,
+    professional_id: professionalId,
+    scheduled_at: date,
+  });
+```
+
+## How to Add New Views Safely
+
+### 1. Create Migration
+```sql
+-- supabase/migrations/YYYYMMDD_create_view_xyz.sql
+CREATE OR REPLACE VIEW view_xyz AS
+SELECT
+  id,
+  name,
+  company_id,
+  created_at
+FROM base_table
+WHERE deleted_at IS NULL;
+```
+
+### 2. Document Fields
+```typescript
+// In service file
+export interface XyzData {
+  id: string;
+  name: string;
+  companyId: string;
+  createdAt: string;
+}
+```
+
+### 3. Verify RLS Inheritance
+- Views automatically inherit RLS from base tables
+- Test that company isolation works
+- Confirm active company filter applies
+
+### 4. Create Service Function
+```typescript
+export async function fetchXyz(companyId: string) {
+  const { data, error } = await supabase
+    .from('view_xyz')
+    .select('*')
+    .eq('company_id', companyId);
+  
+  return { data, error };
+}
+```
+
+## Contract Enforcement
+
+### Development Rules
+1. **Never** query tables directly
+2. **Always** use views for reads
+3. **Always** use RPC for writes
+4. **Never** bypass company scoping
+
+### Code Review Checklist
+- ❌ `supabase.from('clients')` in frontend
+- ❌ `.insert()` or `.update()` or `.delete()` in frontend
+- ✅ `supabase.from('view_clients')`
+- ✅ `supabase.rpc('function_name')`
+
+### Migration Review
+- New views must have company_id filter
+- RPC must validate auth.uid()
+- RPC must validate company ownership
