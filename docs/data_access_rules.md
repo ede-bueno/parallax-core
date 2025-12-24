@@ -41,6 +41,7 @@ const { data } = await supabase
 - Easier to optimize (indexes, materialized views)
 - **Reporting**: Aggregate queries across multiple views for management insights
 - **CSV Export**: Client-side generation from view data for external analysis
+- **Branch Filtering**: Optional branch-aware views for operational data (clients, professionals, appointments)
 
 ## RPC-Only Rule (Writes)
 

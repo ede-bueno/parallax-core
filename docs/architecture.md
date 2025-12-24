@@ -36,6 +36,7 @@
 - **Zero direct table access** from frontend
 - **Report aggregation** via view queries (read-only)
 - **CSV export** client-side from view data
+- **Branch filtering** via branch-aware views for operational data
 
 ### Authentication
 - **Supabase Auth**

@@ -3,11 +3,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { fetchUserContext, UserContextData } from '../services/userContextService';
 import { setActiveCompany } from '../services/companyService';
+import { setActiveBranch } from '../services/branchService';
 
 interface UserContextValue extends UserContextData {
     loading: boolean;
     error: string | null;
     switchCompany: (companyId: string) => Promise<void>;
+    switchBranch: (branchId: string | null) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -31,7 +33,7 @@ interface UserContextProviderProps {
  * - Supports company switching via switchCompany()
  */
 export function UserContextProvider({ children }: UserContextProviderProps) {
-    const [contextValue, setContextValue] = useState<Omit<UserContextValue, 'switchCompany'>>({
+    const [contextValue, setContextValue] = useState<Omit<UserContextValue, 'switchCompany' | 'switchBranch'>>({
         userId: null,
         fullName: null,
         email: null,
@@ -103,9 +105,42 @@ export function UserContextProvider({ children }: UserContextProviderProps) {
         }
     }, [loadUserContext]);
 
+    /**
+     * Switch active branch
+     * Calls RPC set_active_branch and reloads context
+     * NULL = "all branches"
+     */
+    const switchBranch = useCallback(async (branchId: string | null) => {
+        try {
+            setContextValue(prev => ({ ...prev, loading: true, error: null }));
+
+            const { success, error } = await setActiveBranch(branchId);
+
+            if (!success) {
+                setContextValue(prev => ({
+                    ...prev,
+                    loading: false,
+                    error: error || 'Failed to switch branch',
+                }));
+                return;
+            }
+
+            // Reload context after successful switch
+            await loadUserContext();
+        } catch (err) {
+            console.error('Failed to switch branch:', err);
+            setContextValue(prev => ({
+                ...prev,
+                loading: false,
+                error: 'Failed to switch branch',
+            }));
+        }
+    }, [loadUserContext]);
+
     const valueWithSwitch: UserContextValue = {
         ...contextValue,
         switchCompany,
+        switchBranch,
     };
 
     return (

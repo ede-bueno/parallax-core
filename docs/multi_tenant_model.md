@@ -18,6 +18,26 @@
 - Determines which company's data the user sees
 - Can be switched via `set_active_company()` RPC
 
+### Active Branch (Optional)
+- Within a company, user can select **one active branch**
+- Stored as `branch_id` in `user_active_company` table
+- `branch_id = NULL` means "all branches" (admin view)
+- Operational entities (clients, professionals, appointments) are branch-scoped
+- Finance, reports, audit remain company-scoped only
+- Can be switched via `set_active_branch()` RPC
+- Switching company resets branch to NULL
+
+## Hierarchy
+
+```
+User → Company → Branch → Data
+```
+
+- User can belong to multiple companies
+- Each company can have multiple branches
+- Branch filtering applies only to operational data
+- Branch selection is optional (NULL = all branches)
+
 ## Tables
 
 ### company_users
@@ -33,6 +53,7 @@ updated_at
 ```
 user_id      → auth.users.id (unique)
 company_id   → companies.id
+branch_id    → branches.id (nullable, NULL = all branches)
 updated_at
 ```
 
