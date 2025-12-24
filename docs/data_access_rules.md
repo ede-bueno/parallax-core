@@ -43,6 +43,54 @@ const { data } = await supabase
 - **CSV Export**: Client-side generation from view data for external analysis
 - **Branch Filtering**: Optional branch-aware views for operational data (clients, professionals, appointments)
 
+### Branch-Aware Fallback Pattern (Operational Services)
+
+Services for operational entities (clients, professionals, appointments) use explicit fallback:
+
+```typescript
+const view = activeBranchId ? 'view_*_branch' : 'view_*';
+```
+
+**Mandatory Rules:**
+- `activeBranchId` from UserContext only
+- No implicit branch assignment
+- **Writes** ALWAYS require explicit `branch_id`
+- **Reads** adapt based on active branch
+
+**Example Pattern:**
+```typescript
+export async function fetchClients(companyId: string, activeBranchId: string | null) {
+  if (!isSupabaseConfigured()) {
+    return { data: null, error: 'Supabase not configured' };
+  }
+  
+  const view = activeBranchId ? 'view_clients_branch' : 'view_clients';
+  
+  let query = supabase!
+    .from(view)
+    .select('*')
+    .eq('company_id', companyId);
+  
+  if (activeBranchId) {
+    query = query.eq('branch_id', activeBranchId);
+  }
+  
+  const { data, error } = await query;
+  
+  return { data, error: error?.message || null };
+}
+```
+
+**Applies to:**
+- Appointments queries
+- Clients queries
+- Professionals queries
+
+**Does NOT apply to:**
+- Finance (company-scoped)
+- Reports (company-scoped)
+- Audit (company-scoped)
+
 ## RPC-Only Rule (Writes)
 
 ### Why RPC?
