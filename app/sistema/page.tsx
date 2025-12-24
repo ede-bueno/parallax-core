@@ -15,6 +15,163 @@ import {
     Permission,
     CompanyPlan,
 } from '../../services/settingsService';
+import { addCompanyUser, updateUserRole, removeUser } from '../../services/usersService';
+
+// Helper component: Add User Form
+function AddUserForm({ roles, onUserAdded }: { roles: Role[]; onUserAdded: () => void }) {
+    const [email, setEmail] = useState('');
+    const [selectedRole, setSelectedRole] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !selectedRole) return;
+
+        setLoading(true);
+        setError(null);
+
+        const { success, error: rpcError } = await addCompanyUser(email, selectedRole);
+
+        if (success) {
+            setEmail('');
+            setSelectedRole('');
+            onUserAdded();
+        } else {
+            setError(rpcError || 'Erro ao adicionar usuário');
+        }
+
+        setLoading(false);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <input
+                type="email"
+                placeholder="Email do usuário"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{
+                    flex: '1 1 200px',
+                    padding: 'var(--space-2)',
+                    backgroundColor: 'var(--background-default)',
+                    border: '1px solid var(--background-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontSize: 'var(--font-size-sm)',
+                }}
+                required
+            />
+            <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                style={{
+                    flex: '1 1 150px',
+                    padding: 'var(--space-2)',
+                    backgroundColor: 'var(--background-default)',
+                    border: '1px solid var(--background-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontSize: 'var(--font-size-sm)',
+                }}
+                required
+            >
+                <option value="">Selecione role</option>
+                {roles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                ))}
+            </select>
+            <button
+                type="submit"
+                disabled={loading}
+                style={{
+                    padding: 'var(--space-2) var(--space-4)',
+                    backgroundColor: 'var(--action-primary)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--font-size-sm)',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                }}
+            >
+                {loading ? 'Adicionando...' : 'Adicionar'}
+            </button>
+            {error && <p style={{ width: '100%', color: 'var(--status-error)', fontSize: 'var(--font-size-sm)' }}>{error}</p>}
+        </form>
+    );
+}
+
+// Helper component: User Row
+function UserRow({ user, roles, isLast, onUserUpdated }: { user: CompanyUser; roles: Role[]; isLast: boolean; onUserUpdated: () => void }) {
+    const [updating, setUpdating] = useState(false);
+    const [removing, setRemoving] = useState(false);
+
+    const handleRoleChange = async (newRole: string) => {
+        if (newRole === user.role) return;
+
+        setUpdating(true);
+        const { success } = await updateUserRole(user.id, newRole);
+        setUpdating(false);
+
+        if (success) onUserUpdated();
+    };
+
+    const handleRemove = async () => {
+        if (!confirm(`Remover usuário ${user.fullName}?`)) return;
+
+        setRemoving(true);
+        const { success } = await removeUser(user.id);
+        setRemoving(false);
+
+        if (success) onUserUpdated();
+    };
+
+    return (
+        <div style={{ padding: 'var(--space-4)', borderBottom: !isLast ? '1px solid var(--background-border)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-primary)' }}>{user.fullName}</p>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{user.email}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <select
+                    value={user.role}
+                    onChange={(e) => handleRoleChange(e.target.value)}
+                    disabled={updating}
+                    style={{
+                        padding: 'var(--space-2)',
+                        backgroundColor: 'var(--background-default)',
+                        border: '1px solid var(--background-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-primary)',
+                        fontSize: 'var(--font-size-sm)',
+                        cursor: updating ? 'not-allowed' : 'pointer',
+                    }}
+                >
+                    {roles.map(role => (
+                        <option key={role.id} value={role.name}>{role.name}</option>
+                    ))}
+                </select>
+                <button
+                    onClick={handleRemove}
+                    disabled={removing}
+                    style={{
+                        padding: 'var(--space-2) var(--space-3)',
+                        backgroundColor: 'var(--status-error)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--font-size-sm)',
+                        cursor: removing ? 'not-allowed' : 'pointer',
+                        opacity: removing ? 0.6 : 1,
+                    }}
+                >
+                    {removing ? '...' : 'Remover'}
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function SistemaPage() {
     const { companyId, loading: contextLoading } = useUserContext();
@@ -26,39 +183,41 @@ export default function SistemaPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    async function loadSettings() {
+        if (!companyId) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            const [detailsResult, usersResult, rolesResult, permissionsResult, planResult] =
+                await Promise.all([
+                    fetchCompanyDetails(companyId),
+                    fetchCompanyUsers(companyId),
+                    fetchRoles(),
+                    fetchPermissions(),
+                    fetchCompanyPlan(companyId),
+                ]);
+
+            if (detailsResult.error) setError(detailsResult.error);
+            else setCompanyDetails(detailsResult.data);
+
+            if (!usersResult.error) setUsers(usersResult.data || []);
+            if (!rolesResult.error) setRoles(rolesResult.data || []);
+            if (!permissionsResult.error) setPermissions(permissionsResult.data || []);
+            if (!planResult.error) setPlan(planResult.data);
+        } catch (err) {
+            console.error('Settings load error:', err);
+            setError('Erro ao carregar configurações');
+        } finally {
+            setLoading(false);
+        }
+    }
+
     useEffect(() => {
-        async function loadSettings() {
-            if (contextLoading || !companyId) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                const [detailsResult, usersResult, rolesResult, permissionsResult, planResult] =
-                    await Promise.all([
-                        fetchCompanyDetails(companyId),
-                        fetchCompanyUsers(companyId),
-                        fetchRoles(),
-                        fetchPermissions(),
-                        fetchCompanyPlan(companyId),
-                    ]);
-
-                if (detailsResult.error) setError(detailsResult.error);
-                else setCompanyDetails(detailsResult.data);
-
-                if (!usersResult.error) setUsers(usersResult.data || []);
-                if (!rolesResult.error) setRoles(rolesResult.data || []);
-                if (!permissionsResult.error) setPermissions(permissionsResult.data || []);
-                if (!planResult.error) setPlan(planResult.data);
-            } catch (err) {
-                console.error('Settings load error:', err);
-                setError('Erro ao carregar configurações');
-            } finally {
-                setLoading(false);
-            }
+        if (contextLoading || !companyId) {
+            setLoading(false);
+            return;
         }
 
         loadSettings();
@@ -100,12 +259,17 @@ export default function SistemaPage() {
                             <h2 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-4)' }}>
                                 Usuários ({users.length})
                             </h2>
+
+                            {/* Add User Form */}
+                            <div style={{ backgroundColor: 'var(--background-surface)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--background-border)', marginBottom: 'var(--space-4)' }}>
+                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-medium)', marginBottom: 'var(--space-3)' }}>Adicionar Usuário</h3>
+                                <AddUserForm roles={roles} onUserAdded={loadSettings} />
+                            </div>
+
+                            {/* Users List */}
                             <div style={{ backgroundColor: 'var(--background-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--background-border)', overflow: 'hidden' }}>
                                 {users.map((user, index) => (
-                                    <div key={user.id} style={{ padding: 'var(--space-4)', borderBottom: index < users.length - 1 ? '1px solid var(--background-border)' : 'none' }}>
-                                        <p style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-primary)' }}>{user.fullName}</p>
-                                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{user.email} • {user.role}</p>
-                                    </div>
+                                    <UserRow key={user.id} user={user} roles={roles} isLast={index === users.length - 1} onUserUpdated={loadSettings} />
                                 ))}
                             </div>
                         </section>
