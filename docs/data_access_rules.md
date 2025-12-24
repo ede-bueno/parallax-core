@@ -94,11 +94,16 @@ VALUES (
 );
 ```
 
-Logged actions include:
-- User invites
-- Role changes
-- User removals
-- Company switches
+**Instrumented RPCs (production):**
+- `invite_company_user` - Invite user to company
+- `cancel_company_invite` - Cancel pending invite
+- `accept_company_invite` - Accept company invitation
+- `add_company_user` - Add existing user to company
+- `update_company_user_role` - Change user's role
+- `remove_company_user` - Remove user from company
+- `set_active_company` - Switch active company context
+
+Each instrumented RPC creates an audit log entry in the same transaction. If the RPC fails or rolls back, the audit log entry is also rolled back.
 
 Logging happens server-side only. Frontend has read-only access via `view_audit_logs`.
 

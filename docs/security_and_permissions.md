@@ -156,15 +156,19 @@ Track all critical administrative actions for security, compliance, and troubles
 - **Frontend access**: Read-only via `view_audit_logs`
 - **Isolation**: RLS by company_id
 
-### Logged Actions
-All write RPCs that modify user relationships, permissions, or company context log audit entries:
-- Invite user
-- Cancel invite
-- Accept invite
-- Add user
-- Update user role
-- Remove user
-- Switch company
+### Logged Actions (Instrumented)
+All write RPCs that modify user relationships, permissions, or company context automatically log audit entries:
+
+**Instrumented RPCs:**
+- `invite_company_user` → action_type: `invite_user`
+- `cancel_company_invite` → action_type: `cancel_invite`
+- `accept_company_invite` → action_type: `accept_invite`
+- `add_company_user` → action_type: `add_user`
+- `update_company_user_role` → action_type: `update_user_role`
+- `remove_company_user` → action_type: `remove_user`
+- `set_active_company` → action_type: `switch_company`
+
+Logging is transactional: if the RPC fails, the audit log entry rolls back.
 
 ### Audit Log Structure
 - `action_type` - Action identifier
