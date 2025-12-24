@@ -77,6 +77,30 @@ const { error } = await supabase
 - Consistent validation
 - Prevents invalid state
 - Easy to add authorization checks
+- Automatic audit logging for critical actions
+
+### Audit Logging in RPCs
+All write RPCs that perform critical administrative actions MUST create audit log entries:
+
+```sql
+-- Inside RPC function
+INSERT INTO audit_logs (action_type, actor_user_id, target_user_id, company_id, metadata)
+VALUES (
+  'action_identifier',
+  auth.uid(),
+  target_user_id_if_applicable,
+  active_company_id,
+  jsonb_build_object('key', 'value', ...)
+);
+```
+
+Logged actions include:
+- User invites
+- Role changes
+- User removals
+- Company switches
+
+Logging happens server-side only. Frontend has read-only access via `view_audit_logs`.
 
 ## Why Tables Are Never Accessed Directly
 

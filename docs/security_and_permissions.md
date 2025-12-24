@@ -65,6 +65,7 @@ if (role === 'admin') {
 - `clients`
 - `professionals`
 - `appointments`
+- `audit_logs`
 
 **Policy Pattern**:
 ```sql
@@ -140,8 +141,44 @@ supabase.from('table').select().single()
 2. **RLS** - Data access enforcement (reads)
 3. **RPC Validation** - Write operation enforcement
 4. **Company Isolation** - Multi-tenant separation
+5. **Audit Logging** - Immutable trail of critical actions
 
 All layers work together. Frontend controls are for UX only. Backend enforcement is mandatory.
+
+## Audit Logging
+
+### Purpose
+Track all critical administrative actions for security, compliance, and troubleshooting.
+
+### Implementation
+- **Table**: `audit_logs`
+- **Logging location**: Server-side RPCs only
+- **Frontend access**: Read-only via `view_audit_logs`
+- **Isolation**: RLS by company_id
+
+### Logged Actions
+All write RPCs that modify user relationships, permissions, or company context log audit entries:
+- Invite user
+- Cancel invite
+- Accept invite
+- Add user
+- Update user role
+- Remove user
+- Switch company
+
+### Audit Log Structure
+- `action_type` - Action identifier
+- `actor_user_id` - Who performed the action
+- `target_user_id` - Who was affected (if applicable)
+- `company_id` - Company context
+- `metadata` - Additional context (JSONB)
+- `created_at` - When action occurred
+
+### Access Control
+- Only admins can view audit logs
+- Logs scoped to active company
+- No frontend writes allowed
+- Immutable trail (no updates/deletes)
 
 ## Permission Expansion (Future)
 
