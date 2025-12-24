@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import LayoutShell from '../components/layout/LayoutShell';
+import { UserContextProvider } from '../context/UserContext';
 import '../styles/tokens.css';
 import '../styles/globals.css';
 
@@ -16,7 +17,9 @@ export default function RootLayout({
     return (
         <html lang="pt-BR">
             <body>
-                <LayoutShell>{children}</LayoutShell>
+                <UserContextProvider>
+                    <LayoutShell>{children}</LayoutShell>
+                </UserContextProvider>
             </body>
         </html>
     );
