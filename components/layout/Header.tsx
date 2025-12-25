@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
 import { getMyCompanies, Company } from '../../services/companyService';
 import BranchSwitcher from '../system/BranchSwitcher';
-import '../../styles/layout.css';
+
 
 export default function Header() {
     const { companyId, companyName, switchCompany, loading: contextLoading } = useUserContext();

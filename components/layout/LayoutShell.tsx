@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import '../../styles/layout.css';
+
 
 interface LayoutShellProps {
     children: ReactNode;
@@ -11,11 +11,13 @@ interface LayoutShellProps {
 
 export default function LayoutShell({ children }: LayoutShellProps) {
     return (
-        <div className="layout-shell">
+        <div className="flex h-screen overflow-hidden bg-background">
             <Sidebar />
-            <div className="layout-main">
+            <div className="flex flex-col flex-1 overflow-hidden relative">
                 <Header />
-                <main className="layout-content">{children}</main>
+                <main className="flex-1 overflow-y-auto p-5 relative z-0">
+                    {children}
+                </main>
             </div>
         </div>
     );

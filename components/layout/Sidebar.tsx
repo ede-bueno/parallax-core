@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useUserContext } from '../../context/UserContext';
-import '../../styles/layout.css';
+
 
 interface NavItem {
     label: string;
@@ -70,7 +70,12 @@ export default function Sidebar() {
     const { role } = useUserContext();
 
     const toggleGroup = (groupTitle: string) => {
-        setExpandedGroup(expandedGroup === groupTitle ? null : groupTitle);
+        if (!isExpanded) {
+            setIsExpanded(true);
+            setExpandedGroup(groupTitle);
+        } else {
+            setExpandedGroup(expandedGroup === groupTitle ? null : groupTitle);
+        }
     };
 
     /**
@@ -84,64 +89,113 @@ export default function Sidebar() {
 
     /**
      * Check if group is visible to current user role
-     * Group is visible if:
-     * 1. Group has no role restriction, OR
-     * 2. User role matches group roles, AND
-     * 3. At least one child item is visible
      */
     const isGroupVisible = (group: NavGroup): boolean => {
-        // Check if group itself has role restriction
         if (group.roles && role && !group.roles.includes(role)) {
             return false;
         }
-
-        // Check if at least one item is visible
         const visibleItems = group.items.filter(isItemVisible);
         return visibleItems.length > 0;
     };
 
-    /**
-     * Get filtered items for a group based on user role
-     */
     const getVisibleItems = (group: NavGroup): NavItem[] => {
         return group.items.filter(isItemVisible);
     };
 
     return (
-        <aside
-            className={`layout-sidebar ${isExpanded ? 'expanded' : 'collapsed'} ${!isExpanded ? 'sidebar-collapsed' : ''}`}
-        >
-            <nav className="sidebar-nav">
-                {navigationGroups
-                    .filter(isGroupVisible)
-                    .map((group) => {
-                        const visibleItems = getVisibleItems(group);
+        <>
+            {/* Mobile Overlay */}
+            <div
+                className={`md:hidden fixed inset-0 z-20 bg-black/50 transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={() => setIsExpanded(false)}
+            />
 
-                        return (
-                            <div
-                                key={group.title}
-                                className={`nav-group ${expandedGroup !== group.title ? 'collapsed' : ''}`}
-                            >
+            <aside
+                className={`
+                    relative z-30 flex flex-col h-screen
+                    glass border-r border-white/20
+                    transition-all duration-300 ease-in-out
+                    ${isExpanded ? 'w-60' : 'w-20'}
+                    ${!isExpanded ? 'items-center' : ''}
+                `}
+            >
+                {/* Toggle Button */}
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="absolute -right-3 top-6 bg-primary text-white p-1 rounded-full shadow-lg hover:bg-cyan-600 transition-colors z-50 md:flex hidden"
+                >
+                    <span className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                        ▶
+                    </span>
+                </button>
+
+                {/* Navigation */}
+                <nav className="flex-1 overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-white/20">
+                    {navigationGroups
+                        .filter(isGroupVisible)
+                        .map((group) => {
+                            const visibleItems = getVisibleItems(group);
+                            const isGroupExpanded = expandedGroup === group.title;
+
+                            return (
                                 <div
-                                    className="nav-group-header"
-                                    onClick={() => toggleGroup(group.title)}
+                                    key={group.title}
+                                    className={`mb-2 px-3 ${!isExpanded ? 'w-full px-2' : ''}`}
                                 >
-                                    <span className="nav-group-icon">{group.icon}</span>
-                                    <span className="nav-group-title">{group.title}</span>
-                                    <span className="nav-group-chevron">▼</span>
-                                </div>
-                                <div className="nav-items">
-                                    {visibleItems.map((item) => (
-                                        <div key={item.label} className="nav-item">
-                                            <span className="nav-item-icon">{item.icon}</span>
-                                            <span className="nav-item-label">{item.label}</span>
+                                    {/* Group Header */}
+                                    <div
+                                        className={`
+                                            flex items-center p-2 rounded-lg cursor-pointer
+                                            transition-colors duration-200
+                                            hover:bg-white/10 text-slate-700
+                                            ${!isExpanded ? 'justify-center' : 'justify-between'}
+                                        `}
+                                        onClick={() => toggleGroup(group.title)}
+                                        title={group.title}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">{group.icon}</span>
+                                            {isExpanded && (
+                                                <span className="font-semibold text-sm uppercase tracking-wide opacity-80">
+                                                    {group.title}
+                                                </span>
+                                            )}
                                         </div>
-                                    ))}
+                                        {isExpanded && (
+                                            <span className={`text-xs transition-transform duration-200 ${isGroupExpanded ? 'rotate-180' : ''}`}>
+                                                ▼
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Group Items */}
+                                    <div className={`
+                                        overflow-hidden transition-all duration-300 ease-in-out
+                                        ${(isGroupExpanded || !isExpanded) ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'}
+                                    `}>
+                                        <div className="flex flex-col gap-1">
+                                            {visibleItems.map((item) => (
+                                                <div
+                                                    key={item.label}
+                                                    className={`
+                                                        flex items-center p-2 rounded-md cursor-pointer
+                                                        text-slate-600 hover:text-primary hover:bg-cyan-50
+                                                        transition-all duration-200
+                                                        ${!isExpanded ? 'justify-center' : 'pl-9'}
+                                                    `}
+                                                    title={item.label}
+                                                >
+                                                    <span className={`${!isExpanded ? 'text-lg' : 'text-sm'}`}>{item.icon}</span>
+                                                    {isExpanded && <span className="ml-3 text-sm font-medium">{item.label}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-            </nav>
-        </aside>
+                            );
+                        })}
+                </nav>
+            </aside>
+        </>
     );
 }

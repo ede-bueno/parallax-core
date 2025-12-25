@@ -1,0 +1,6 @@
+# Parallax Golden Rules
+
+1. A Agenda nunca recebe pagamentos.
+2. Todo pagamento exige uma Order (Comanda) e um Cash Register (Caixa) aberto.
+3. Use Tailwind com Glassmorphism.
+4. Respeite sempre o company_id do contexto do usuário.
